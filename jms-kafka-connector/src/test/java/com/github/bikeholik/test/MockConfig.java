@@ -1,15 +1,39 @@
 package com.github.bikeholik.test;
 
-import javax.jms.ConnectionFactory;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyBoolean;
+import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import org.mockito.Mockito;
+import javax.jms.Connection;
+import javax.jms.ConnectionFactory;
+import javax.jms.Destination;
+import javax.jms.JMSException;
+import javax.jms.Session;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.jms.support.destination.DestinationResolver;
 
 @Configuration
 public class MockConfig {
     @Bean
-    ConnectionFactory connectionFactory(){
-        return Mockito.mock(ConnectionFactory.class);
+    ConnectionFactory connectionFactory() throws JMSException {
+        ConnectionFactory connectionFactory = mock(ConnectionFactory.class);
+        Connection connection = mock(Connection.class);
+        when(connectionFactory.createConnection()).thenReturn(connection);
+        when(connection.createSession(anyBoolean(), anyInt())).thenReturn(mock(Session.class));
+        return connectionFactory;
+    }
+
+    @Bean
+    @Primary
+    DestinationResolver destinationResolver() throws JMSException {
+        DestinationResolver destinationResolver = mock(DestinationResolver.class);
+        when(destinationResolver.resolveDestinationName(any(Session.class), anyString(), anyBoolean())).thenReturn(mock(Destination.class));
+        return destinationResolver;
     }
 }

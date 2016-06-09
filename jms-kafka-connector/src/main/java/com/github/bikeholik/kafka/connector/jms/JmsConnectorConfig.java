@@ -1,20 +1,20 @@
 package com.github.bikeholik.kafka.connector.jms;
 
 import javax.jms.ConnectionFactory;
-import javax.jms.Destination;
-import javax.jms.JMSException;
-import javax.jms.Session;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.SearchStrategy;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.jms.support.destination.DestinationResolver;
+import org.springframework.jms.support.destination.DynamicDestinationResolver;
 
 @Configuration
+@EnableConfigurationProperties
 @ComponentScan
 public class JmsConnectorConfig {
     @Autowired
@@ -28,26 +28,10 @@ public class JmsConnectorConfig {
         return jmsTemplate;
     }
 
-    private static class TopicsMappingHolder {
-        private final Map<String, Destination> topicsMapping;
-
-        @Autowired
-        private TopicsMappingHolder(
-                JmsTemplate jmsTemplate,
-                DestinationResolver destinationResolver,
-                JmsConnectorConfigurationProperties properties) {
-            topicsMapping = jmsTemplate.execute(session -> {
-                return properties.getTopicToJmsQueue().entrySet().stream()
-                        .collect(Collectors.toMap(Map.Entry::getKey, e -> getDestination(destinationResolver, session, e.getKey(), false)));
-            });
-        }
-
-        private Destination getDestination(DestinationResolver destinationResolver, Session session, String destinationName, boolean pubSubDomain) {
-            try {
-                return destinationResolver.resolveDestinationName(session, destinationName, pubSubDomain);
-            } catch (JMSException e1) {
-                throw new IllegalArgumentException(e1);
-            }
-        }
+    @Bean
+    @ConditionalOnMissingBean(search = SearchStrategy.ALL)
+    DestinationResolver destinationResolver(){
+        return new DynamicDestinationResolver();
     }
+
 }

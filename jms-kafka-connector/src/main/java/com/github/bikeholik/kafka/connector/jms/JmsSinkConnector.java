@@ -37,13 +37,12 @@ public class JmsSinkConnector extends SinkConnector {
 
     public void start(Map<String, String> map) {
         logger.info("operation=start properties={}", map);
-        properties = map.entrySet().stream()
-                .filter(e -> e.getKey().startsWith(PROPERTY_PREFIX))
-                .collect(Collectors.toMap(e -> e.getKey().substring(PROPERTY_PREFIX.length()), Map.Entry::getValue));
+
 
         // create context
         ConfigurableApplicationContext applicationContext = new SpringApplicationBuilder(JmsConnectorConfig.class)
                 .web(false)
+                .properties(map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
                 .parent(new AnnotationConfigApplicationContext(Optional.ofNullable(map.get(PACKAGES)).map(s -> s.split(",")).orElseGet(() -> new String[0]))) // error ?
                 .build()
                 .run();

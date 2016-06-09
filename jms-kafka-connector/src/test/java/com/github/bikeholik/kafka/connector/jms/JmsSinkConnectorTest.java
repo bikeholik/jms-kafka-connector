@@ -10,8 +10,8 @@ public class JmsSinkConnectorTest {
 
     static {
         testProperties.put(JmsSinkConnector.PACKAGES, "com.github.bikeholik.test");
-        testProperties.put("jms.sessionTransacted", "false");
-        testProperties.put("jms.topicToJmsQueue.test", "test");
+        testProperties.put("jms.sessionTransacted", "true");
+        testProperties.put("jms.topicToJmsQueue.testTopic", "testQueue");
     }
 
     @Test
