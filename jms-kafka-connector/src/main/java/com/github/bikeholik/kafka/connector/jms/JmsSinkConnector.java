@@ -1,6 +1,6 @@
 package com.github.bikeholik.kafka.connector.jms;
 
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -18,14 +18,11 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 
 public class JmsSinkConnector extends SinkConnector {
 
-    private static final String PROPERTY_PREFIX = "jms.";
     static final String PROPERTY_TASK_ID = "task-id";
     public static final String PACKAGES = "component-packages";
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
     private static ConfigurableApplicationContext CONTEXT_REFERENCE;
-
-    private Map<String, String> properties;
 
     public String version() {
         return getVersion(getClass());
@@ -51,8 +48,6 @@ public class JmsSinkConnector extends SinkConnector {
             CONTEXT_REFERENCE = applicationContext;
             JmsSinkConnector.class.notifyAll();
         }
-
-//        build.
     }
 
     public static ApplicationContext getApplicationContext() {
@@ -79,9 +74,7 @@ public class JmsSinkConnector extends SinkConnector {
     }
 
     private Map<String, String> createTaskProperties(int taskId) {
-        Map<String, String> taskProperties = new HashMap<>(properties);
-        taskProperties.put(PROPERTY_TASK_ID, String.valueOf(taskId));
-        return taskProperties;
+        return Collections.singletonMap(PROPERTY_TASK_ID, String.valueOf(taskId));
     }
 
     public void stop() {

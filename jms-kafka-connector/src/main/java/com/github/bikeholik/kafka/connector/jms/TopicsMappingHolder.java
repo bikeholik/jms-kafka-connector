@@ -4,6 +4,7 @@ import javax.jms.Destination;
 import javax.jms.JMSException;
 import javax.jms.Session;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.slf4j.LoggerFactory;
@@ -39,5 +40,9 @@ class TopicsMappingHolder {
         } catch (JMSException e1) {
             throw new IllegalArgumentException(e1);
         }
+    }
+
+    public Optional<Destination> getDestination(String topicName) {
+        return Optional.ofNullable(topicsMapping.get(topicName));
     }
 }

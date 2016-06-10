@@ -1,16 +1,15 @@
 package com.github.bikeholik.kafka.connector.jms;
 
-import javax.jms.Destination;
 import javax.jms.JMSException;
 import javax.jms.Message;
-import javax.jms.MessageProducer;
 import javax.jms.Session;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.Function;
 
+import javafx.util.Pair;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.connect.errors.RetriableException;
@@ -18,22 +17,18 @@ import org.apache.kafka.connect.sink.SinkRecord;
 import org.apache.kafka.connect.sink.SinkTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jms.core.JmsTemplate;
 import org.springframework.jms.core.ProducerCallback;
 import org.springframework.jms.support.converter.MessageConverter;
-import rx.Observable;
-import rx.Subscriber;
-import rx.functions.Func1;
+import org.springframework.stereotype.Component;
 
 public class JmsSinkTask extends SinkTask {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
-    private final Map<String, Destination> topicToJmsDestinationMapping = new HashMap<>();
+    private Sender sender;
 
-    private JmsTemplate jmsTemplate = new JmsTemplate();
-
-    private MessageConverter messageConverter = jmsTemplate.getMessageConverter();
     private String id;
 
     public String version() {
@@ -42,63 +37,13 @@ public class JmsSinkTask extends SinkTask {
 
     public void start(Map<String, String> map) {
         logger.info("operation=start properties={}", map);
-        id = map.getOrDefault(JmsSinkConnector.PROPERTY_TASK_ID, "x");
-
+        id = map.getOrDefault(JmsSinkConnector.PROPERTY_TASK_ID, "task-" + UUID.randomUUID().toString());
+        this.sender = JmsSinkConnector.getApplicationContext().getBean(Sender.class);
     }
 
     public void put(Collection<SinkRecord> collection) {
-        logger.info("operation=put size={}", collection.size());
-        jmsTemplate.execute(topicToJmsDestinationMapping.get("x"), new ProducerCallback<Void>() {
-            @Override
-            public Void doInJms(Session session, MessageProducer messageProducer) throws JMSException {
-                Observable
-                        .from(collection)
-                        .map(new Func1<SinkRecord, Optional<Message>>() {
-                            @Override
-                            public Optional<Message> call(SinkRecord sinkRecord) {
-                                try {
-                                    return Optional.of(messageConverter.toMessage(sinkRecord.value(), session));
-                                } catch (JMSException e) {
-                                    return Optional.empty();
-                                }
-                            }
-                        })
-                        .filter(Optional::isPresent)
-                        .map(message -> message.get()) // TODO error ?
-                        .subscribe(new Subscriber<Message>() {
-                            @Override
-                            public void onCompleted() {
-                                call(session::commit, RetriableException::new);
-                            }
-
-                            @Override
-                            public void onError(Throwable e) {
-                                throw new RetriableException(e);
-                            }
-
-                            @Override
-                            public void onNext(Message message) {
-                                call(() -> {
-                                    // TODO destination
-                                    messageProducer.send(message);
-                                }, RuntimeException::new);
-                            }
-                        });
-                return null;
-            }
-        });
-    }
-
-    private interface JmsAction {
-        void execute() throws JMSException;
-    }
-
-    private static void call(JmsAction callback, Function<Exception, RuntimeException> exceptionMapper) {
-        try {
-            callback.execute();
-        } catch (Exception e) {
-            throw exceptionMapper.apply(e);
-        }
+        logger.info("operation=put id={} size={}", id, collection.size());
+        sender.sendMessages(collection);
     }
 
     public void flush(Map<TopicPartition, OffsetAndMetadata> map) {
@@ -108,5 +53,53 @@ public class JmsSinkTask extends SinkTask {
 
     public void stop() {
         logger.info("operation=stop id={}", id);
+    }
+
+    @Component
+    static class Sender {
+        private final JmsTemplate jmsTemplate;
+        private final MessageConverter messageConverter;
+        private final TopicsMappingHolder topicsMappingHolder;
+
+        @Autowired
+        public Sender(JmsTemplate jmsTemplate, TopicsMappingHolder topicsMappingHolder) {
+            this.jmsTemplate = jmsTemplate;
+            this.messageConverter = jmsTemplate.getMessageConverter();
+            this.topicsMappingHolder = topicsMappingHolder;
+        }
+
+        private static void call(JmsAction callback, Function<Exception, RuntimeException> exceptionMapper) {
+            try {
+                callback.execute();
+            } catch (Exception e) {
+                throw exceptionMapper.apply(e);
+            }
+        }
+
+        void sendMessages(final Collection<SinkRecord> collection) {
+            jmsTemplate.execute((ProducerCallback<Void>) (session, messageProducer) -> {
+                collection.stream()
+                        .map(sinkRecord -> topicsMappingHolder.getDestination(sinkRecord.topic())
+                                .flatMap(destination -> toMessage(sinkRecord.value(), session)
+                                        .map(message -> new Pair<>(destination, message))))
+                        .filter(Optional::isPresent)
+                        .map(Optional::get)
+                        .forEach(message -> call(() -> messageProducer.send(message.getKey(), message.getValue()), RetriableException::new));
+                call(session::commit, RetriableException::new);
+                return null;
+            });
+        }
+
+        private Optional<Message> toMessage(Object o, Session session) {
+            try {
+                return Optional.of(messageConverter.toMessage(o, session));
+            } catch (JMSException e) {
+                return Optional.empty();
+            }
+        }
+
+        private interface JmsAction {
+            void execute() throws JMSException;
+        }
     }
 }
