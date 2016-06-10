@@ -58,6 +58,7 @@ public class SenderTest {
     @Before
     public void setUp() throws Exception {
         JmsTemplate jmsTemplate = new JmsTemplate(connectionFactory);
+        jmsTemplate.setSessionTransacted(true);
         MappingJackson2MessageConverter messageConverter = new MappingJackson2MessageConverter();
         messageConverter.setTargetType(MessageType.TEXT);
         jmsTemplate.setMessageConverter(messageConverter);
