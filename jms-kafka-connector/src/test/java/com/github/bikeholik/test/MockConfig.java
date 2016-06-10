@@ -36,4 +36,5 @@ public class MockConfig {
         when(destinationResolver.resolveDestinationName(any(Session.class), anyString(), anyBoolean())).thenReturn(mock(Destination.class));
         return destinationResolver;
     }
+
 }

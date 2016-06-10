@@ -13,9 +13,6 @@ import org.springframework.jms.core.JmsTemplate;
 import org.springframework.jms.support.destination.DestinationResolver;
 import org.springframework.stereotype.Component;
 
-/**
- * TODO comment
- */
 @Component
 class TopicsMappingHolder {
     private final Map<String, Destination> topicsMapping;
@@ -29,7 +26,7 @@ class TopicsMappingHolder {
             return properties.getTopicToJmsQueue().entrySet().stream()
                     .collect(Collectors.toMap(
                             Map.Entry::getKey,
-                            e -> getDestination(destinationResolver, session, e.getKey(), false)));
+                            e -> getDestination(destinationResolver, session, e.getValue(), false)));
         });
         LoggerFactory.getLogger(getClass()).info("mappings={}", topicsMapping);
     }

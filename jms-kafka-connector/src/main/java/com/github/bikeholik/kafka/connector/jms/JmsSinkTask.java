@@ -57,6 +57,7 @@ public class JmsSinkTask extends SinkTask {
 
     @Component
     static class Sender {
+        private final Logger logger = LoggerFactory.getLogger(getClass());
         private final JmsTemplate jmsTemplate;
         private final MessageConverter messageConverter;
         private final TopicsMappingHolder topicsMappingHolder;
@@ -79,13 +80,16 @@ public class JmsSinkTask extends SinkTask {
         void sendMessages(final Collection<SinkRecord> collection) {
             jmsTemplate.execute((ProducerCallback<Void>) (session, messageProducer) -> {
                 collection.stream()
+                        .peek(record -> logger.debug("operation=nextMessage topic={}", record.topic()))
                         .map(sinkRecord -> topicsMappingHolder.getDestination(sinkRecord.topic())
                                 .flatMap(destination -> toMessage(sinkRecord.value(), session)
                                         .map(message -> new Pair<>(destination, message))))
                         .filter(Optional::isPresent)
                         .map(Optional::get)
                         .forEach(message -> call(() -> messageProducer.send(message.getKey(), message.getValue()), RetriableException::new));
-                call(session::commit, RetriableException::new);
+                if(jmsTemplate.isSessionTransacted()) {
+                    call(session::commit, RetriableException::new);
+                }
                 return null;
             });
         }
@@ -94,6 +98,7 @@ public class JmsSinkTask extends SinkTask {
             try {
                 return Optional.of(messageConverter.toMessage(o, session));
             } catch (JMSException e) {
+                e.printStackTrace();
                 return Optional.empty();
             }
         }

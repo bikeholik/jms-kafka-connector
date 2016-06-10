@@ -14,7 +14,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 public class JmsSinkConnector extends SinkConnector {
 
@@ -35,19 +34,21 @@ public class JmsSinkConnector extends SinkConnector {
     public void start(Map<String, String> map) {
         logger.info("operation=start properties={}", map);
 
-
         // create context
         ConfigurableApplicationContext applicationContext = new SpringApplicationBuilder(JmsConnectorConfig.class)
                 .web(false)
                 .properties(map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
-                .parent(new AnnotationConfigApplicationContext(Optional.ofNullable(map.get(PACKAGES)).map(s -> s.split(",")).orElseGet(() -> new String[0]))) // error ?
-                .build()
+                .sources(getClientBasePackages(map))
                 .run();
 
         synchronized (JmsSinkConnector.class) {
             CONTEXT_REFERENCE = applicationContext;
             JmsSinkConnector.class.notifyAll();
         }
+    }
+
+    private Object[] getClientBasePackages(Map<String, String> map) {
+        return Optional.ofNullable(map.get(PACKAGES)).map(s -> s.split(",")).orElseGet(() -> new String[0]);
     }
 
     public static ApplicationContext getApplicationContext() {
