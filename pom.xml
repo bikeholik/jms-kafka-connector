@@ -9,6 +9,7 @@
     <url>http://maven.apache.org</url>
     <modules>
         <module>jms-kafka-connector</module>
+        <module>hornetq-connector</module>
     </modules>
     <dependencyManagement>
         <dependencies>
@@ -28,6 +29,11 @@
                 <version>${spring-boot.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter</artifactId>
+                <version>${spring-boot.version}</version>
             </dependency>
             <dependency>
                 <groupId>junit</groupId>
@@ -60,7 +66,13 @@
                     <artifactId>maven-shade-plugin</artifactId>
                     <version>2.4.3</version>
                     <configuration>
-                        <!-- put your configurations here -->
+                        <artifactSet>
+                            <excludes>
+                                <exclude>ch.qos.logback:*</exclude>
+                                <exclude>log4j:*</exclude>
+                                <exclude>org.slf4j:*</exclude>
+                            </excludes>
+                        </artifactSet>
                     </configuration>
                     <executions>
                         <execution>
