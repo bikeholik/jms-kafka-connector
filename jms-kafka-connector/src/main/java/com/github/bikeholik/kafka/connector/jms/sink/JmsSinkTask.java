@@ -1,4 +1,4 @@
-package com.github.bikeholik.kafka.connector.jms;
+package com.github.bikeholik.kafka.connector.jms.sink;
 
 import javax.jms.JMSException;
 import javax.jms.Message;
@@ -9,6 +9,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 
+import com.github.bikeholik.kafka.connector.jms.util.ApplicationContextHolder;
+import com.github.bikeholik.kafka.connector.jms.util.TopicsMappingHolder;
 import javafx.util.Pair;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
@@ -38,7 +40,7 @@ public class JmsSinkTask extends SinkTask {
     public void start(Map<String, String> map) {
         logger.info("operation=start properties={}", map);
         id = map.getOrDefault(JmsSinkConnector.PROPERTY_TASK_ID, "task-" + UUID.randomUUID().toString());
-        this.sender = JmsSinkConnector.getApplicationContext().getBean(Sender.class);
+        this.sender = ApplicationContextHolder.getApplicationContext().getBean(Sender.class);
     }
 
     public void put(Collection<SinkRecord> collection) {

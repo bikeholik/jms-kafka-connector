@@ -1,4 +1,4 @@
-package com.github.bikeholik.kafka.connector.jms;
+package com.github.bikeholik.kafka.connector.jms.sink;
 
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.anyBoolean;
@@ -20,6 +20,8 @@ import javax.jms.TextMessage;
 import java.util.Collections;
 import java.util.Optional;
 
+import com.github.bikeholik.kafka.connector.jms.sink.JmsSinkTask;
+import com.github.bikeholik.kafka.connector.jms.util.TopicsMappingHolder;
 import org.apache.kafka.connect.errors.RetriableException;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.junit.Before;

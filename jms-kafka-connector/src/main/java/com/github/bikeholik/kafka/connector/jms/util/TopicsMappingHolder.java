@@ -1,4 +1,4 @@
-package com.github.bikeholik.kafka.connector.jms;
+package com.github.bikeholik.kafka.connector.jms.util;
 
 import javax.jms.Destination;
 import javax.jms.JMSException;
@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import com.github.bikeholik.kafka.connector.jms.JmsConnectorConfigurationProperties;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jms.core.JmsTemplate;
@@ -14,7 +15,7 @@ import org.springframework.jms.support.destination.DestinationResolver;
 import org.springframework.stereotype.Component;
 
 @Component
-class TopicsMappingHolder {
+public class TopicsMappingHolder {
     private final Map<String, Destination> topicsMapping;
 
     @Autowired

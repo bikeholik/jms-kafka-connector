@@ -8,6 +8,9 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class HornetQConnectionFactoryConfig {
 
+
+    // different connection factories depending on settings
+
     @Bean
     ConnectionFactory connectionFactory(HornetQConnectionFactoryProperties props) {
         return HornetQConnectionFactoryBuilder.forCluster(props.getCluster())
