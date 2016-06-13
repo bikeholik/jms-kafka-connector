@@ -10,6 +10,7 @@ import javax.jms.MessageConsumer;
 import javax.jms.Session;
 import javax.jms.TextMessage;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,16 +24,19 @@ import org.apache.kafka.connect.connector.Task;
 import org.apache.kafka.connect.source.SourceConnector;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.apache.kafka.connect.source.SourceTask;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
-/**
- * TODO comment
- */
 public class JmsSourceConnector extends SourceConnector {
+
+    private static final String TASK_DESTINATION_NAME = "destinationName";
+    private String[] queues;
+
     @Override
     public String version() {
         return null;
@@ -40,7 +44,10 @@ public class JmsSourceConnector extends SourceConnector {
 
     @Override
     public void start(Map<String, String> props) {
-
+        ApplicationContextHolder.startApplicationContext(props);
+        queues = Optional.ofNullable(props.get("queues"))
+                .map(","::split)
+                .orElseThrow(IllegalArgumentException::new);
     }
 
     @Override
@@ -50,12 +57,22 @@ public class JmsSourceConnector extends SourceConnector {
 
     @Override
     public List<Map<String, String>> taskConfigs(int maxTasks) {
-        return null;
+        // #tasks > #queues
+        return IntStream.range(0, maxTasks)
+                .mapToObj(this::buildTask)
+                .collect(Collectors.toList());
+    }
+
+    private Map<String, String> buildTask(int i) {
+        HashMap<String, String> map = new HashMap<>();
+        map.put(TASK_DESTINATION_NAME, queues[i % queues.length]);
+        map.put("task-id", String.valueOf(i));
+        return map;
     }
 
     @Override
     public void stop() {
-
+        ApplicationContextHolder.closeApplicationContext();
     }
 
     public static class JmsSourceTask extends SourceTask {
@@ -71,7 +88,7 @@ public class JmsSourceConnector extends SourceConnector {
         public void start(Map<String, String> props) {
             // get session & consumer (per one queue -> meaning multiply tasks by queues count)
             // TODO or is t one connector per topic ? -> source record has a topic
-            String destinationName = props.get("destinationName");
+            String destinationName = props.get(TASK_DESTINATION_NAME);
             ApplicationContext context = ApplicationContextHolder.getApplicationContext();
             messageReceiver = context
                     .getBean(MessageReceiver.class,
@@ -91,28 +108,33 @@ public class JmsSourceConnector extends SourceConnector {
 
         @Override
         public void stop() {
-            // stop session
+            messageReceiver.stop();
         }
 
         @Override
         public void commit() throws InterruptedException {
             // TODO commit session
+            messageReceiver.commitIfNecessary();
         }
     }
 
     @Component
     @Scope(scopeName = ConfigurableBeanFactory.SCOPE_PROTOTYPE)
-    static class MessageReceiver {
+    static class MessageReceiver implements AutoCloseable{
+        private final Logger logger = LoggerFactory.getLogger(getClass());
         private final Session session;
+        private final JmsConnectorConfigurationProperties connectorConfigurationProperties;
         private final TopicsMappingHolder topicsMappingHolder;
         private final String destinationName;
-        private MessageConsumer messageConsumer;
+        private final MessageConsumer messageConsumer;
 
         @Autowired
         MessageReceiver(ConnectionFactory connectionFactory, JmsConnectorConfigurationProperties connectorConfigurationProperties, TopicsMappingHolder topicsMappingHolder, String destinationName) throws JMSException {
+            this.connectorConfigurationProperties = connectorConfigurationProperties;
             this.topicsMappingHolder = topicsMappingHolder;
             this.destinationName = destinationName;
             Connection connection = connectionFactory.createConnection();
+            // TODO ack type
             this.session = connection.createSession(connectorConfigurationProperties.isSessionTransacted(), 0);
             this.messageConsumer = topicsMappingHolder.getTopic(destinationName)
                     .flatMap(topicsMappingHolder::getDestination)
@@ -137,14 +159,14 @@ public class JmsSourceConnector extends SourceConnector {
                         }
                     })
                     .filter(Optional::isPresent)
-                    .map(opt -> (TextMessage)opt.get())
+                    .map(opt -> (TextMessage) opt.get())
                     .map(message -> new SourceRecord(Collections.<String, Object>emptyMap(), Collections.<String, Object>emptyMap(),
                             topicsMappingHolder.getTopic(destinationName).get(),
                             STRING_SCHEMA, getText(message)))
                     .collect(Collectors.toList());
         }
 
-        public String getText(TextMessage message)  {
+        public String getText(TextMessage message) {
             try {
                 return message.getText();
             } catch (JMSException e) {
@@ -158,6 +180,30 @@ public class JmsSourceConnector extends SourceConnector {
             } catch (JMSException e) {
                 throw new RuntimeException(e);
             }
+        }
+
+        public void commitIfNecessary() {
+            if (connectorConfigurationProperties.isSessionTransacted()) {
+                try {
+                    session.commit();
+                } catch (JMSException e) {
+                    logger.error("Error when onCommit", e);
+                }
+            }
+        }
+
+        public void stop() {
+            try {
+                messageConsumer.close();
+                session.close();
+            } catch (JMSException _) {
+
+            }
+        }
+
+        @Override
+        public void close() throws Exception {
+            stop();
         }
     }
 }
