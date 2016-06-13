@@ -11,6 +11,7 @@ import javax.jms.Connection;
 import javax.jms.ConnectionFactory;
 import javax.jms.Destination;
 import javax.jms.JMSException;
+import javax.jms.MessageConsumer;
 import javax.jms.Session;
 
 import org.springframework.context.annotation.Bean;
@@ -25,7 +26,9 @@ public class MockConfig {
         ConnectionFactory connectionFactory = mock(ConnectionFactory.class);
         Connection connection = mock(Connection.class);
         when(connectionFactory.createConnection()).thenReturn(connection);
-        when(connection.createSession(anyBoolean(), anyInt())).thenReturn(mock(Session.class));
+        Session session = mock(Session.class);
+        when(connection.createSession(anyBoolean(), anyInt())).thenReturn(session);
+        when(session.createConsumer(any(Destination.class))).thenReturn(mock(MessageConsumer.class));
         return connectionFactory;
     }
 

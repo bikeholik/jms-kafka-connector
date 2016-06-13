@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import com.github.bikeholik.kafka.connector.jms.JmsConnectorConfig;
 import com.github.bikeholik.kafka.connector.jms.util.ApplicationContextHolder;
 import org.apache.kafka.connect.connector.Task;
 import org.apache.kafka.connect.sink.SinkConnector;
@@ -30,8 +29,7 @@ public class JmsSinkConnector extends SinkConnector {
         logger.info("operation=start properties={}", map);
 
         // create context
-        Class<JmsConnectorConfig> jmsConnectorConfigClass = JmsConnectorConfig.class;
-        ApplicationContextHolder.startApplicationContext(map, jmsConnectorConfigClass);
+        ApplicationContextHolder.startApplicationContext(map);
     }
 
     public Class<? extends Task> taskClass() {

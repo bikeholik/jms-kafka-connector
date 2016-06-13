@@ -34,4 +34,7 @@ public class JmsConnectorConfig {
         return new DynamicDestinationResolver();
     }
 
+    // TODO
+//    messageConverter ?
+
 }

@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class TopicsMappingHolder {
     private final Map<String, Destination> topicsMapping;
+    private final Map<String, String> jmsDestinationsMapping;
 
     @Autowired
     TopicsMappingHolder(
@@ -29,6 +30,8 @@ public class TopicsMappingHolder {
                             Map.Entry::getKey,
                             e -> getDestination(destinationResolver, session, e.getValue(), false)));
         });
+        jmsDestinationsMapping = properties.getTopicToJmsQueue().entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
         LoggerFactory.getLogger(getClass()).info("mappings={}", topicsMapping);
     }
 
@@ -42,5 +45,9 @@ public class TopicsMappingHolder {
 
     public Optional<Destination> getDestination(String topicName) {
         return Optional.ofNullable(topicsMapping.get(topicName));
+    }
+
+    public Optional<String> getTopic(String queueName) {
+        return Optional.ofNullable(jmsDestinationsMapping.get(queueName));
     }
 }

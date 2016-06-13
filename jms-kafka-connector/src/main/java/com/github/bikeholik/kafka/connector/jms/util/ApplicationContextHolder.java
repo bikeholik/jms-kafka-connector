@@ -15,8 +15,8 @@ public class ApplicationContextHolder {
     public static final String PACKAGES = "component-packages";
     private static final AtomicReference<ConfigurableApplicationContext> CONTEXT_REFERENCE = new AtomicReference<>();
 
-    public static void startApplicationContext(Map<String, String> map, Class<JmsConnectorConfig> jmsConnectorConfigClass) {
-        ConfigurableApplicationContext applicationContext = new SpringApplicationBuilder(jmsConnectorConfigClass)
+    public static void startApplicationContext(Map<String, String> map) {
+        ConfigurableApplicationContext applicationContext = new SpringApplicationBuilder(JmsConnectorConfig.class)
                 .web(false)
                 .properties(map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
                 .sources(getClientBasePackages(map))
