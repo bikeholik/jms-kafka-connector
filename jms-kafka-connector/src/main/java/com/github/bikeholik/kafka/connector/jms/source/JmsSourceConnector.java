@@ -46,7 +46,7 @@ public class JmsSourceConnector extends SourceConnector {
     public void start(Map<String, String> props) {
         ApplicationContextHolder.startApplicationContext(props);
         queues = Optional.ofNullable(props.get("queues"))
-                .map(","::split)
+                .map(queueNames -> queueNames.split(","))
                 .orElseThrow(IllegalArgumentException::new);
     }
 
@@ -86,6 +86,7 @@ public class JmsSourceConnector extends SourceConnector {
 
         @Override
         public void start(Map<String, String> props) {
+            LoggerFactory.getLogger(getClass()).info("op=start props={}", props);
             // get session & consumer (per one queue -> meaning multiply tasks by queues count)
             // TODO or is t one connector per topic ? -> source record has a topic
             String destinationName = props.get(TASK_DESTINATION_NAME);
@@ -120,21 +121,23 @@ public class JmsSourceConnector extends SourceConnector {
 
     @Component
     @Scope(scopeName = ConfigurableBeanFactory.SCOPE_PROTOTYPE)
-    static class MessageReceiver implements AutoCloseable{
+    static class MessageReceiver implements AutoCloseable {
         private final Logger logger = LoggerFactory.getLogger(getClass());
         private final Session session;
         private final JmsConnectorConfigurationProperties connectorConfigurationProperties;
         private final TopicsMappingHolder topicsMappingHolder;
         private final String destinationName;
         private final MessageConsumer messageConsumer;
+        private final Connection connection;
 
         @Autowired
         MessageReceiver(ConnectionFactory connectionFactory, JmsConnectorConfigurationProperties connectorConfigurationProperties, TopicsMappingHolder topicsMappingHolder, String destinationName) throws JMSException {
             this.connectorConfigurationProperties = connectorConfigurationProperties;
             this.topicsMappingHolder = topicsMappingHolder;
             this.destinationName = destinationName;
-            Connection connection = connectionFactory.createConnection();
+            this.connection = connectionFactory.createConnection();
             // TODO ack type
+            this.connection.start();
             this.session = connection.createSession(connectorConfigurationProperties.isSessionTransacted(), 0);
             this.messageConsumer = topicsMappingHolder.getTopic(destinationName)
                     .flatMap(topicsMappingHolder::getDestination)
@@ -146,18 +149,14 @@ public class JmsSourceConnector extends SourceConnector {
                         }
                     })
                     .orElseThrow(() -> new IllegalStateException("Unknown destination: " + destinationName));
+            logger.info("op=started for={}", destinationName);
         }
 
-        public List<SourceRecord> poll() {
+        List<SourceRecord> poll() {
+            logger.info("op=pool from={}", destinationName);
             // receive up to X messages
             return IntStream.range(0, 10)
-                    .mapToObj(i -> {
-                        try {
-                            return Optional.ofNullable(getMessage());
-                        } catch (Exception e) {
-                            return Optional.empty();
-                        }
-                    })
+                    .mapToObj(i -> Optional.ofNullable(getMessage()))
                     .filter(Optional::isPresent)
                     .map(opt -> (TextMessage) opt.get())
                     .map(message -> new SourceRecord(Collections.<String, Object>emptyMap(), Collections.<String, Object>emptyMap(),
@@ -166,23 +165,29 @@ public class JmsSourceConnector extends SourceConnector {
                     .collect(Collectors.toList());
         }
 
-        public String getText(TextMessage message) {
+        String getText(TextMessage message) {
             try {
                 return message.getText();
             } catch (JMSException e) {
+                logger.error("op=errorOnGetText", e);
                 return null;
             }
         }
 
-        public Message getMessage() {
+        Message getMessage() {
             try {
-                return messageConsumer.receiveNoWait();
+                Message message = messageConsumer.receive(10);
+                if (message == null) {
+                    logger.debug("op=noMessage");
+                }
+                return message;
             } catch (JMSException e) {
-                throw new RuntimeException(e);
+                logger.error("op=errorOnReceive", e);
+                return null;
             }
         }
 
-        public void commitIfNecessary() {
+        void commitIfNecessary() {
             if (connectorConfigurationProperties.isSessionTransacted()) {
                 try {
                     session.commit();
@@ -192,10 +197,12 @@ public class JmsSourceConnector extends SourceConnector {
             }
         }
 
-        public void stop() {
+        void stop() {
             try {
+                connection.stop();;
                 messageConsumer.close();
                 session.close();
+                connection.close();
             } catch (JMSException _) {
 
             }

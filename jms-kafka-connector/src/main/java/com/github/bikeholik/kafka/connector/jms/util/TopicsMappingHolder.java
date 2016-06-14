@@ -24,6 +24,7 @@ public class TopicsMappingHolder {
             JmsTemplate jmsTemplate,
             DestinationResolver destinationResolver,
             JmsConnectorConfigurationProperties properties) {
+        // TODO delay resolution in case broker is not available ?
         topicsMapping = jmsTemplate.execute(session -> {
             return properties.getTopicToJmsQueue().entrySet().stream()
                     .collect(Collectors.toMap(
