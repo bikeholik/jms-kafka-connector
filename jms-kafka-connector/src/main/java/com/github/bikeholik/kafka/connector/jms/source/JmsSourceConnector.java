@@ -153,7 +153,7 @@ public class JmsSourceConnector extends SourceConnector {
         }
 
         List<SourceRecord> poll() {
-            logger.info("op=pool from={}", destinationName);
+            logger.trace("op=pool from={}", destinationName);
             // receive up to X messages
             return IntStream.range(0, 10)
                     .mapToObj(i -> Optional.ofNullable(getMessage()))
