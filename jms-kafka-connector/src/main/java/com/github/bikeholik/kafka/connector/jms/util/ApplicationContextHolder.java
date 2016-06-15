@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 
 import com.github.bikeholik.kafka.connector.jms.JmsConnectorConfig;
 import com.github.bikeholik.kafka.connector.jms.sink.JmsSinkConnector;
+import org.springframework.boot.Banner;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -18,6 +19,7 @@ public class ApplicationContextHolder {
     public static void startApplicationContext(Map<String, String> map) {
         ConfigurableApplicationContext applicationContext = new SpringApplicationBuilder(JmsConnectorConfig.class)
                 .web(false)
+                .bannerMode(Banner.Mode.OFF)
                 .properties(map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)))
                 .sources(getClientBasePackages(map))
                 .run();
