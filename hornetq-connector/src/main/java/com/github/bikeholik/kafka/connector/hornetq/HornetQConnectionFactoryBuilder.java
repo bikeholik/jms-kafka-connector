@@ -40,6 +40,8 @@ class HornetQConnectionFactoryBuilder {
     private long retryInterval = DEFAULT_RETRY_INTERVAL;
 
     private int reconnectAttempts = DEFAULT_RECONNECT_ATTEMPTS;
+    private boolean cacheProducers;
+    private boolean cacheConsumers;
 
     private HornetQConnectionFactoryBuilder(String clusterAddress) {
 
@@ -100,6 +102,8 @@ class HornetQConnectionFactoryBuilder {
 
         CachingConnectionFactory cachingConnectionFactory = new CachingConnectionFactory(userCredentialsAdapter);
         cachingConnectionFactory.setSessionCacheSize(sessionsCached);
+        cachingConnectionFactory.setCacheProducers(cacheProducers);
+        cachingConnectionFactory.setCacheConsumers(cacheConsumers);
 
         return cachingConnectionFactory;
     }
@@ -142,5 +146,15 @@ class HornetQConnectionFactoryBuilder {
         }
 
         return configurations;
+    }
+
+    public HornetQConnectionFactoryBuilder cacheProducers(boolean cacheProducers) {
+        this.cacheProducers = cacheProducers;
+        return this;
+    }
+
+    public HornetQConnectionFactoryBuilder cacheConsumers(boolean cacheConsumers) {
+        this.cacheConsumers = cacheConsumers;
+        return this;
     }
 }

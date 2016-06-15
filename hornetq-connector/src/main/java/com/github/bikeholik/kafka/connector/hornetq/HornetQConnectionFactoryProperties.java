@@ -40,6 +40,8 @@ public class HornetQConnectionFactoryProperties {
     private Integer consumerWindowSize;
 
     private Integer confirmationWindowSize;
+    private boolean cacheProducers;
+    private boolean cacheConsumers;
 
     public Long getCallTimeout() {
         return callTimeout;
@@ -178,4 +180,19 @@ public class HornetQConnectionFactoryProperties {
     }
 
 
+    public boolean isCacheProducers() {
+        return cacheProducers;
+    }
+
+    public void setCacheProducers(boolean cacheProducers) {
+        this.cacheProducers = cacheProducers;
+    }
+
+    public boolean isCacheConsumers() {
+        return cacheConsumers;
+    }
+
+    public void setCacheConsumers(boolean cacheConsumers) {
+        this.cacheConsumers = cacheConsumers;
+    }
 }
