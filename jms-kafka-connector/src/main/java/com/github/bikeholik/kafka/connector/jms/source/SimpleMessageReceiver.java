@@ -22,13 +22,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 @Component
 @Scope(scopeName = ConfigurableBeanFactory.SCOPE_PROTOTYPE)
-@ConditionalOnProperty(name = "jms.consumer.type", havingValue = "simple")
 class SimpleMessageReceiver implements AutoCloseable, MessageReceiver {
     private final Logger logger = LoggerFactory.getLogger(getClass());
     private final Session session;

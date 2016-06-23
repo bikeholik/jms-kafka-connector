@@ -8,9 +8,6 @@ import com.github.bikeholik.test.TestProperties;
 import org.junit.Assert;
 import org.junit.Test;
 
-/**
- * TODO comment
- */
 public class JmsSourceTaskTest {
 
     private static Map<String, String> testProperties = new HashMap<>();
@@ -21,6 +18,7 @@ public class JmsSourceTaskTest {
         testProperties.put(ApplicationContextHolder.PACKAGES, "com.github.bikeholik.test");
         testProperties.put("jms.sessionTransacted", "true");
         testProperties.put("jms.topicToJmsQueue.testTopic", "testQueue");
+        testProperties.put("jms.messageReceiverClass", SimpleMessageReceiver.class.getName());
         testProperties.put("test.name", TEST);
         testProperties.put("destinationName", "testQueue");
     }

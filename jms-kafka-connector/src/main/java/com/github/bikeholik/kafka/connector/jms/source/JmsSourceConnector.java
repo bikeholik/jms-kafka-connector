@@ -77,10 +77,11 @@ public class JmsSourceConnector extends SourceConnector {
             // TODO or is t one connector per topic ? -> source record has a topic
             String destinationName = props.get(TASK_DESTINATION_NAME);
             ApplicationContext context = ApplicationContextHolder.getApplicationContext();
+            JmsConnectorConfigurationProperties properties = context.getBean(JmsConnectorConfigurationProperties.class);
             messageReceiver = context
-                    .getBean(SimpleMessageReceiver.class,
+                    .getBean(properties.getMessageReceiverClass(),
                             context.getBean(ConnectionFactory.class),
-                            context.getBean(JmsConnectorConfigurationProperties.class),
+                            properties,
                             context.getBean(TopicsMappingHolder.class),
                             destinationName);
         }

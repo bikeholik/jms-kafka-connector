@@ -29,6 +29,7 @@ public class MockConfig {
         Session session = mock(Session.class);
         when(connection.createSession(anyBoolean(), anyInt())).thenReturn(session);
         when(session.createConsumer(any(Destination.class))).thenReturn(mock(MessageConsumer.class));
+        when(session.createConsumer(any(Destination.class), anyString())).thenReturn(mock(MessageConsumer.class));
         return connectionFactory;
     }
 

@@ -3,63 +3,72 @@ package com.github.bikeholik.kafka.connector.jms.source;
 import static org.apache.kafka.connect.data.Schema.STRING_SCHEMA;
 
 import javax.jms.ConnectionFactory;
-import javax.jms.JMSException;
 import javax.jms.Message;
-import javax.jms.MessageConsumer;
 import javax.jms.MessageListener;
-import javax.jms.Session;
 import javax.jms.TextMessage;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TransferQueue;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import com.github.bikeholik.kafka.connector.jms.JmsConnectorConfigurationProperties;
 import com.github.bikeholik.kafka.connector.jms.util.TopicsMappingHolder;
+import org.aopalliance.aop.Advice;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.springframework.batch.container.jms.BatchMessageListenerContainer;
+import org.springframework.batch.repeat.RepeatContext;
+import org.springframework.batch.repeat.interceptor.RepeatOperationsInterceptor;
+import org.springframework.batch.repeat.listener.RepeatListenerSupport;
+import org.springframework.batch.repeat.support.RepeatTemplate;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Scope;
 import org.springframework.jms.connection.JmsTransactionManager;
-import org.springframework.jms.listener.DefaultMessageListenerContainer;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.interceptor.TransactionInterceptor;
 
 @Component
 @Scope(scopeName = ConfigurableBeanFactory.SCOPE_PROTOTYPE)
-@ConditionalOnProperty(name = "jms.consumer.type", havingValue = "container")
 public class ListeningContainerMessageReceiver implements MessageReceiver, MessageListener {
 
-    private final BlockingMessageListenerContainer listenerContainer;
+    private final BatchMessageListenerContainer listenerContainer;
     private final TransferQueue<Message> messagesQueue = new LinkedTransferQueue<>();
 
     private final TopicsMappingHolder topicsMappingHolder;
     private final String destinationName;
-    private final JmsTransactionManager transactionManager;
+    private final BlockingRepeatListener repeatListener;
 
     public ListeningContainerMessageReceiver(ConnectionFactory connectionFactory, JmsConnectorConfigurationProperties connectorConfigurationProperties, TopicsMappingHolder topicsMappingHolder, String destinationName) {
         this.topicsMappingHolder = topicsMappingHolder;
         this.destinationName = destinationName;
-        this.listenerContainer = new BlockingMessageListenerContainer();
+        this.listenerContainer = new BatchMessageListenerContainer();
         this.listenerContainer.setConnectionFactory(connectionFactory);
         this.listenerContainer.setMaxConcurrentConsumers(1);
-        this.listenerContainer.start();
         this.listenerContainer.setMessageListener(this);
+        RepeatOperationsInterceptor repeatOperationsInterceptor = new RepeatOperationsInterceptor();
+        RepeatTemplate repeatTemplate = new RepeatTemplate();
+        repeatListener = new BlockingRepeatListener();
+        repeatTemplate.registerListener(repeatListener);
+        repeatOperationsInterceptor.setRepeatOperations(repeatTemplate);
         if (connectorConfigurationProperties.isSessionTransacted()) {
-            this.transactionManager = new JmsTransactionManager(connectionFactory);
-            this.listenerContainer.setTransactionManager(transactionManager);
+            this.listenerContainer.setAdviceChain(new Advice[]{new TransactionInterceptor(new JmsTransactionManager(connectionFactory), new Properties()), repeatOperationsInterceptor});
         } else {
-            this.transactionManager = null;
+            this.listenerContainer.setAdviceChain(new Advice[]{repeatOperationsInterceptor});
         }
+        this.listenerContainer.setDestination(topicsMappingHolder.getTopic(destinationName).flatMap(topicsMappingHolder::getDestination).orElseThrow(() -> new IllegalStateException(destinationName + " not found")));
+        this.listenerContainer.start();
+        this.listenerContainer.afterPropertiesSet();
     }
 
     @Override
     public List<SourceRecord> poll() {
         return IntStream.range(0, 10)
-                .filter(i -> this.listenerContainer.allowConsumption())
+                .filter(i -> this.repeatListener.allowConsumption())
                 .mapToObj(i -> Optional.ofNullable(getMessage()))
                 .filter(Optional::isPresent)
                 .map(opt -> (TextMessage) opt.get())
@@ -79,11 +88,13 @@ public class ListeningContainerMessageReceiver implements MessageReceiver, Messa
 
     @Override
     public void commitIfNecessary() {
-        // TODO each message committed separately at the moment
+        this.repeatListener.markCompleted();
     }
 
     @Override
     public void close() throws Exception {
+        // TODO does it interrupt threads ?
+        this.repeatListener.markTerminated();
         this.listenerContainer.stop();
         this.listenerContainer.destroy();
     }
@@ -98,36 +109,45 @@ public class ListeningContainerMessageReceiver implements MessageReceiver, Messa
         }
     }
 
-    private static class BlockingMessageListenerContainer extends DefaultMessageListenerContainer {
+    private static class BlockingRepeatListener extends RepeatListenerSupport {
         private final TransferQueue<Boolean> permissionQueue = new LinkedTransferQueue<>();
+        private final AtomicReference<RepeatContext> currentContext = new AtomicReference<>(null);
 
         @Override
-        protected boolean receiveAndExecute(Object invoker, Session session, MessageConsumer consumer) throws JMSException {
+        public void open(RepeatContext context) {
+            currentContext.set(context);
+            super.open(context);
+        }
+
+        @Override
+        public void before(RepeatContext context) {
             try {
-                // TODO should match connector polling time
-                if (!permissionQueue.poll(30, TimeUnit.SECONDS)) {
-                    return false;
+                while (permissionQueue.poll(500, TimeUnit.MILLISECONDS) == null && !context.isCompleteOnly() && !context.isTerminateOnly()) {
+                    // NOP wait for permission
+                }
+                if (context.isTerminateOnly()) {
+                    throw new RuntimeException("Terminated");
                 }
             } catch (InterruptedException e) {
-                throw new JMSException("Failed to get permission");
-            }
-            return super.receiveAndExecute(invoker, session, consumer);
-        }
-
-        @Override
-        protected void commitIfNecessary(Session session, Message message) throws JMSException {
-            if (!isSessionTransacted()) {
-                super.commitIfNecessary(session, message);
+                throw new RuntimeException("Failed to get permission", e);
             }
         }
 
-        public boolean allowConsumption() {
+        boolean allowConsumption() {
             try {
                 // TODO time should be configurable
                 return permissionQueue.tryTransfer(Boolean.TRUE, 10, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 return false;
             }
+        }
+
+        void markCompleted() {
+            Optional.ofNullable(currentContext.get()).ifPresent(RepeatContext::setCompleteOnly);
+        }
+
+        void markTerminated() {
+            Optional.ofNullable(currentContext.get()).ifPresent(RepeatContext::setTerminateOnly);
         }
     }
 }
