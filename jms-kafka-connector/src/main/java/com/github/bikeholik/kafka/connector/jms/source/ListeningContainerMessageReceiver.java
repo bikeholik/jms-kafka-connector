@@ -23,8 +23,10 @@ import org.aopalliance.aop.Advice;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.springframework.batch.container.jms.BatchMessageListenerContainer;
 import org.springframework.batch.repeat.RepeatContext;
+import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.batch.repeat.interceptor.RepeatOperationsInterceptor;
 import org.springframework.batch.repeat.listener.RepeatListenerSupport;
+import org.springframework.batch.repeat.policy.CompletionPolicySupport;
 import org.springframework.batch.repeat.support.RepeatTemplate;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.context.annotation.Scope;
@@ -54,6 +56,12 @@ public class ListeningContainerMessageReceiver implements MessageReceiver, Messa
         RepeatTemplate repeatTemplate = new RepeatTemplate();
         repeatListener = new BlockingRepeatListener();
         repeatTemplate.registerListener(repeatListener);
+        repeatTemplate.setCompletionPolicy(new CompletionPolicySupport(){
+            @Override
+            public boolean isComplete(RepeatContext context, RepeatStatus result) {
+                return context.isTerminateOnly();
+            }
+        });
         repeatOperationsInterceptor.setRepeatOperations(repeatTemplate);
         if (connectorConfigurationProperties.isSessionTransacted()) {
             this.listenerContainer.setAdviceChain(new Advice[]{new TransactionInterceptor(new JmsTransactionManager(connectionFactory), new Properties()), repeatOperationsInterceptor});
@@ -80,7 +88,7 @@ public class ListeningContainerMessageReceiver implements MessageReceiver, Messa
 
     private Message getMessage() {
         try {
-            return messagesQueue.poll(1, TimeUnit.SECONDS);
+            return messagesQueue.poll(100, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             return null;
         }

@@ -49,5 +49,6 @@ public class ApplicationContextHolder {
 
     public static void closeApplicationContext() {
         Optional.ofNullable(CONTEXT_REFERENCE.get()).ifPresent(ConfigurableApplicationContext::close);
+        CONTEXT_REFERENCE.set(null);
     }
 }

@@ -37,9 +37,11 @@ public class ListeningContainerMessageReceiverTest {
                         context.getBean(ConnectionFactory.class),
                         context.getBean(JmsConnectorConfigurationProperties.class),
                         context.getBean(TopicsMappingHolder.class),
-                        "test");
+                        "testQueue");
 
         Assert.assertNotNull(messageReceiver.poll());
+
+        messageReceiver.commitIfNecessary();
 
         connector.stop();
     }
