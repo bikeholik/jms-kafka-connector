@@ -129,6 +129,15 @@ public class BatchMessageListenerContainer extends DefaultMessageListenerContain
         return proxy.receiveAndExecute(invoker, session, consumer);
     }
 
+    @Override
+    protected void noMessageReceived(Object invoker, Session session) {
+        try {
+            invokeListener(session, null);
+        } catch (JMSException e) {
+            logger.error("Error invoking listener", e);
+        }
+    }
+
     /**
      *
      */

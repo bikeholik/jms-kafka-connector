@@ -21,6 +21,8 @@ import com.github.bikeholik.kafka.connector.jms.JmsConnectorConfigurationPropert
 import com.github.bikeholik.kafka.connector.jms.util.TopicsMappingHolder;
 import org.aopalliance.aop.Advice;
 import org.apache.kafka.connect.source.SourceRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.batch.container.jms.BatchMessageListenerContainer;
 import org.springframework.batch.repeat.RepeatContext;
 import org.springframework.batch.repeat.RepeatStatus;
@@ -38,6 +40,7 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
 @Scope(scopeName = ConfigurableBeanFactory.SCOPE_PROTOTYPE)
 public class ListeningContainerMessageReceiver implements MessageReceiver, MessageListener {
 
+    private final Logger logger = LoggerFactory.getLogger(getClass());
     private final BatchMessageListenerContainer listenerContainer;
     private final TransferQueue<Message> messagesQueue = new LinkedTransferQueue<>();
 
@@ -56,7 +59,7 @@ public class ListeningContainerMessageReceiver implements MessageReceiver, Messa
         RepeatTemplate repeatTemplate = new RepeatTemplate();
         repeatListener = new BlockingRepeatListener();
         repeatTemplate.registerListener(repeatListener);
-        repeatTemplate.setCompletionPolicy(new CompletionPolicySupport(){
+        repeatTemplate.setCompletionPolicy(new CompletionPolicySupport() {
             @Override
             public boolean isComplete(RepeatContext context, RepeatStatus result) {
                 return context.isTerminateOnly();
@@ -76,10 +79,13 @@ public class ListeningContainerMessageReceiver implements MessageReceiver, Messa
     @Override
     public List<SourceRecord> poll() {
         return IntStream.range(0, 10)
+                .peek(i -> logger.trace("op=requestMessage i={}", i))
                 .filter(i -> this.repeatListener.allowConsumption())
+                .peek(i -> logger.trace("op=waitForMessage i={}", i))
                 .mapToObj(i -> Optional.ofNullable(getMessage()))
                 .filter(Optional::isPresent)
                 .map(opt -> (TextMessage) opt.get())
+                .peek(msg -> logger.debug("op=prepareRecord hash={}", msg.hashCode()))
                 .map(message -> new SourceRecord(Collections.<String, Object>emptyMap(), Collections.<String, Object>emptyMap(),
                         topicsMappingHolder.getTopic(destinationName).get(),
                         STRING_SCHEMA, MessageReceiver.getText(message)))
@@ -88,7 +94,7 @@ public class ListeningContainerMessageReceiver implements MessageReceiver, Messa
 
     private Message getMessage() {
         try {
-            return messagesQueue.poll(100, TimeUnit.MILLISECONDS);
+            return messagesQueue.poll(1, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             return null;
         }
@@ -96,6 +102,7 @@ public class ListeningContainerMessageReceiver implements MessageReceiver, Messa
 
     @Override
     public void commitIfNecessary() {
+        logger.debug("op=commit");
         this.repeatListener.markCompleted();
     }
 
@@ -109,8 +116,11 @@ public class ListeningContainerMessageReceiver implements MessageReceiver, Messa
 
     @Override
     public void onMessage(Message message) {
+        logger.debug("op=onMessage hash={}", Optional.ofNullable(message).map(Object::hashCode).map(String::valueOf).orElse("NONE"));
         try {
-            messagesQueue.transfer(message);
+            if (!messagesQueue.tryTransfer(message, 10, TimeUnit.SECONDS)) {
+                throw new RuntimeException("Requested message not taken");
+            }
         } catch (InterruptedException e) {
             // TODO should trigger rollback ?
             throw new RuntimeException(e);
