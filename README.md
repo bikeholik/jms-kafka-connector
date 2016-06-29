@@ -17,6 +17,7 @@ jms.sessionTransacted=true
 hornetq.cluster=localhost:5457
 hornetq.user=admin
 hornetq.password=changeme
+hornetq.connectionFactory.type=auth
 queues=test
 
 ```

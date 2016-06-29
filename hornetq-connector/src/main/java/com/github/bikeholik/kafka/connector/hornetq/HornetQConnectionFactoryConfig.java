@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 public class HornetQConnectionFactoryConfig {
 
     @Bean
-    @ConditionalOnProperty(name = "hornetq.connectionFactory.type", havingValue = "auth", matchIfMissing = true)
+    @ConditionalOnProperty(name = "hornetq.connectionFactory.type", havingValue = "auth")
     ConnectionFactory authenticatingConnectionFactory(HornetQConnectionFactoryProperties props) {
         return newBuilder(props)
                 .password(props.getPassword())
