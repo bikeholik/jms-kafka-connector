@@ -31,6 +31,7 @@ public class JmsSourceConnector extends SourceConnector {
     @Override
     public void start(Map<String, String> props) {
         ApplicationContextHolder.startApplicationContext(props);
+        // TODO move to properties
         queues = Optional.ofNullable(props.get("queues"))
                 .map(queueNames -> queueNames.split(","))
                 .orElseThrow(IllegalArgumentException::new);
@@ -88,9 +89,6 @@ public class JmsSourceConnector extends SourceConnector {
 
         @Override
         public List<SourceRecord> poll() throws InterruptedException {
-            //
-            // read up to X messages
-            // can source partition/offset be empty ?
             return messageReceiver.poll();
         }
 
