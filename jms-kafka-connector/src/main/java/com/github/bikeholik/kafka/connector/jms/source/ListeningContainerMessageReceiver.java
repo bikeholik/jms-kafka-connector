@@ -95,8 +95,10 @@ public class ListeningContainerMessageReceiver implements MessageReceiver, Messa
                 .peek(i -> logger.trace("op=waitForMessage i={}", i))
                 .mapToObj(i -> getMessage())
                 .filter(Optional::isPresent)
+                // TODO apply converter
                 .map(opt -> (TextMessage) opt.get())
                 .peek(msg -> logger.debug("op=prepareRecord hash={}", msg.hashCode()))
+                // TODO extract record building and partition resolution
                 .map(message -> new SourceRecord(
                         singletonMap("destination", destinationName),
                         singletonMap(destinationName, getJmsMessageID(message)),

@@ -22,5 +22,11 @@ queues=test
 
 ```
  
+So far tested with follwoing converter settings in ``config/connect-standalone.properties``
+```
+key.converter=org.apache.kafka.connect.storage.StringConverter
+value.converter=org.apache.kafka.connect.storage.StringConverter
+```
+ 
 ## Known issues
  - Transactional source connector will not  work with kafka 0.9.0.x because of https://issues.apache.org/jira/browse/KAFKA-3225
