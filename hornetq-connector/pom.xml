@@ -1,10 +1,10 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <artifactId>jms-kafka-connector</artifactId>
+    <artifactId>hornetq-connector</artifactId>
     <packaging>jar</packaging>
     <version>0.1-SNAPSHOT</version>
-    <name>jms-kafka-connector</name>
+    <name>hornetq-connector</name>
     <url>http://maven.apache.org</url>
     <parent>
         <groupId>com.github.bikeholik</groupId>
@@ -12,6 +12,16 @@
         <version>0.1-SNAPSHOT</version>
     </parent>
     <dependencies>
+        <dependency>
+            <groupId>org.hornetq</groupId>
+            <artifactId>hornetq-server</artifactId>
+            <version>${hornetq.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.hornetq</groupId>
+            <artifactId>hornetq-jms-client</artifactId>
+            <version>${hornetq.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>connect-json</artifactId>
@@ -59,4 +69,7 @@
             </plugin>
         </plugins>
     </build>
+    <properties>
+        <hornetq.version>2.4.7.Final</hornetq.version>
+    </properties>
 </project>
